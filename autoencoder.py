@@ -8,32 +8,65 @@ def sigmoid(x, beta=1.0):
 def sigmoid_deriv(u):
     return (u * (1 - u))
 
-def encode(x):
-    return sigmond(numpy.dot())
-
-def decode(x):
-
 class AutoEncoder(object):
     def __init__(self, n_visible_units, n_hidden_units, noise):
-        #高性能擬似乱数生成器である"メルセンヌツイスター"を用いた乱数生成.
+        #create merusenne twister
         self.rng = np.random.RandomState(1)
-        #重みの設定.0に近い範囲で重みを設定すると解への収束が早まる
+        #initial weight scope
         r = np.sqrt(6. / (n_hidden_units + n_visible_units + 1))
-        #encode weight, uniformは-r~rの範囲での一様乱数生成に用いる.
+        #encode weight setting
         self.enc_w = np.array(self.rng.uniform(-r, r, (n_visible_units, n_hidden_units)))
-        #decode weight. enc_wの転置行列
+        #decode weight setting
         self.dec_w = self.enc_w.T
-        #バイアス初期化
+        #bias setting
         self.enc_b = np.zeros(n_hidden_units)
         self.dec_b = np.zeros(n_visible_units)
-        #その他初期化
+        #initial value setting
         self.n_visible = n_visible_units
         self.n_hidden = n_hidden_units
         self.noise = noise
 
-    #learning_rateは学習係数, epochsは学習の回数
+    #learning_rate, epochs:repeat learning count
     def sgd_train(self, learning_rate=0.1, epochs=20):
-        print("hoge")
+        #minibatch algorizhm
+        #partition length learning_data
+        batch_num = len(X) / batch_size
+
+        #online
+        for epoch in range(epochs):
+            total_cost = 0.0 #sum error(gosa)
+            #batch
+            for i in range(batch_num):
+                batch = X[i*batch_size : (i+1)*batch_size] #slice
+
+                cost, gradEnc_w, gradDec_w, gradEnc_b, gradDec_b = \
+                    self.get_cost_and_grad(batch, len(X)) #partial differentiation
+
+                #update weight and bias
+                total_cost += cost
+                self.enc_w -= learning_rate * gradEnc_w
+                self.dec_w -= learning_rate * gradDec_w
+                self.enc_b -= learning_rate * gradEnc_w
+                self.dec_b -= learning_rate * gradDec_w
+
+                grad_sum = gradEnc_w.sum() + gradDec_w.sum() + gradEnc_w.sum() + gradDec_w.sum()
+
+            print(epoch)
+            print((1. / batch_num) * total_cost)
+
+    def encode(self, x):
+        #evaluate y
+        return sigmoid(numpy.dot(self.enc_w, x) + self.enc_b)
+
+    def decode(self, y):
+        #evaluate z
+        return sigmoid(numpy.dot(self.dec_w, y) + self.dec_b)
+
+    def corrupt(self, x, noise):
+        #make noise
+        return self.rng.binomial(size = x.shape, n = 1, p = 1.0 - noise) * x
+
 
 if __name__ == '__main__':
     ae = AutoEncoder(n_visible_units=784, n_hidden_units=100, noise=0.2)
+    
