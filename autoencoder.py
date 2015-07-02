@@ -40,7 +40,7 @@ class AutoEncoder(object):
                 batch = X[i*batch_size : (i+1)*batch_size] #slice
 
                 cost, gradEnc_w, gradDec_w, gradEnc_b, gradDec_b = \
-                    self.get_cost_and_grad(batch, len(X)) #partial differentiation
+                    self.partial_differentiation(batch, len(X)) #partial differentiation
 
                 #update weight and bias
                 total_cost += cost
@@ -54,19 +54,62 @@ class AutoEncoder(object):
             print(epoch)
             print((1. / batch_num) * total_cost)
 
+    def partial_differentiation(self, x_batch, dnum):
+
+        #cost:diff enc,dec. initial grad
+        cost = 0.
+        grad_enc_w = np.zeros(self.enc_w.shape)
+        grad_dec_w = np.zeros(self.dec_w.shape)
+        grad_enc_b = np.zeros(self.enc_b.shape)
+        grad_dec_b = np.zeros(self.dec_b.shape)
+
+        for x in x_batch:
+            #add noise in data.
+            tilde_x = self.corrupt(x, self.noise)
+            #encode
+            y = self.encode(tilde_x)
+            #decode
+            z = self.decode(y)
+
+            #get_cost:L = -Lh = xlogz + (1-x)log(1-z)
+            cost += self.get_cost(x,z)
+
+            delta1 = - (x - z)
+
+            #np.outer: outer product => nerrow sense tensor product
+            grad_enc_w += np.outer(delta1, y).T
+            grad_dec_b += delta1
+
+            delta2 = np.dot(self.dec_w.T, delta1) * self.sigmoid_prime(y)
+            grad_enc_w += np.outer(delta2, tilde_x)
+            grad_enc_b += delta2
+
+        #Normalization
+        cost /= len(x_batch)
+        grad_enc_w /= len(x_batch)
+        grad_dec_w /= len(x_batch)
+        grad_enc_b /= len(x_batch)
+        grad_dec_b /= len(x_batch)
+
+        return cost, grad_enc_w, grad_dec_w, grad_enc_b, grad_dec_b
+
     def encode(self, x):
         #evaluate y
-        return sigmoid(numpy.dot(self.enc_w, x) + self.enc_b)
+        return sigmoid(np.dot(self.enc_w, x) + self.enc_b)
 
     def decode(self, y):
         #evaluate z
-        return sigmoid(numpy.dot(self.dec_w, y) + self.dec_b)
+        return sigmoid(np.dot(self.dec_w, y) + self.dec_b)
 
     def corrupt(self, x, noise):
         #make noise
         return self.rng.binomial(size = x.shape, n = 1, p = 1.0 - noise) * x
 
+    def get_cost(self, x, z):
+        eps = 1e-10
+        return - np.sum((x * np.log(z + eps) + (1.-x) * np.log(1.-z + eps)))
+
 
 if __name__ == '__main__':
     ae = AutoEncoder(n_visible_units=784, n_hidden_units=100, noise=0.2)
-    
+    #ae.sgd_train()
