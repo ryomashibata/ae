@@ -1,6 +1,9 @@
 #config:utf-8
 
 import numpy as np
+import pickle
+import gzip
+from PIL import Image
 
 def sigmoid(x, beta=1.0):
     return 1.0 / (1.0 + np.exp(beta * -x))
@@ -109,7 +112,20 @@ class AutoEncoder(object):
         eps = 1e-10
         return - np.sum((x * np.log(z + eps) + (1.-x) * np.log(1.-z + eps)))
 
+    def display(self):
+        tile_size = (int(np.sqrt(self.enc_w[0].size)), int(np.sqrt(self.enc_w[0].size)))
+
+        panel_shape = (10, 10)
+
+        #return utils.visualize_weights(self.enc_w, panel_shape, tile_size)
+
+        #panel_shape = (int(np.sqrt(self.enc_w.shape[0])), int(np.sqrt(self.enc_w.shape[0])))
+        #return utils.visualize_weights(self.enc_w, panel_shape, tile_size)
 
 if __name__ == '__main__':
     ae = AutoEncoder(n_visible_units=784, n_hidden_units=100, noise=0.2)
+    #load_data
+    #with gzip.open('mnist.pkl.gz', 'rb') as f:
+    #    train_data, test_data, valid_data = pickle.load(f)
+
     #ae.sgd_train()
