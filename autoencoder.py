@@ -11,6 +11,13 @@ def sigmoid(x, beta=1.0):
 def sigmoid_deriv(u):
     return (u * (1 - u))
 
+def scale(x):
+    eps = 1e-8
+    x = x.copy()
+    x -= x.min()
+    x *= 1.0 / (x.max() + eps)
+    return 255.0*x
+
 class AutoEncoder(object):
     def __init__(self, n_visible_units, n_hidden_units, noise):
         #create merusenne twister
@@ -29,33 +36,21 @@ class AutoEncoder(object):
         self.n_hidden = n_hidden_units
         self.noise = noise
 
-    #learning_rate, epochs:repeat learning count
-    def sgd_train(self, learning_rate=0.1, epochs=20):
-        #minibatch algorizhm
-        #partition length learning_data
-        batch_num = len(X) / batch_size
+    def encode(self, x):
+        #evaluate y
+        return sigmoid(np.dot(self.enc_w.T, x) + self.enc_b)
 
-        #online
-        for epoch in range(epochs):
-            total_cost = 0.0 #sum error(gosa)
-            #batch
-            for i in range(batch_num):
-                batch = X[i*batch_size : (i+1)*batch_size] #slice
+    def decode(self, y):
+        #evaluate z
+        return sigmoid(np.dot(self.dec_w.T, y) + self.dec_b)
 
-                cost, gradEnc_w, gradDec_w, gradEnc_b, gradDec_b = \
-                    self.partial_differentiation(batch, len(X)) #partial differentiation
+    def corrupt(self, x, noise):
+        #make noise
+        return self.rng.binomial(size = x.shape, n = 1, p = 1.0 - noise) * x
 
-                #update weight and bias
-                total_cost += cost
-                self.enc_w -= learning_rate * gradEnc_w
-                self.dec_w -= learning_rate * gradDec_w
-                self.enc_b -= learning_rate * gradEnc_w
-                self.dec_b -= learning_rate * gradDec_w
-
-                grad_sum = gradEnc_w.sum() + gradDec_w.sum() + gradEnc_w.sum() + gradDec_w.sum()
-
-            print(epoch)
-            print((1. / batch_num) * total_cost)
+    def get_cost(self, x, z):
+        eps = 1e-10
+        return - np.sum((x * np.log(z + eps) + (1.-x) * np.log(1.-z + eps)))
 
     def partial_differentiation(self, x_batch, dnum):
 
@@ -96,26 +91,51 @@ class AutoEncoder(object):
 
         return cost, grad_enc_w, grad_dec_w, grad_enc_b, grad_dec_b
 
-    def encode(self, x):
-        #evaluate y
-        return sigmoid(np.dot(self.enc_w, x) + self.enc_b)
+    #learning_rate, epochs:repeat learning count
+    def sgd_train(self, X, learning_rate=0.1, epochs=20, batch_size = 20):
+        #minibatch algorizhm
+        #partition length learning_data
+        batch_num = len(X) / batch_size
+        batch_num = int(batch_num)
+        #online
+        for epoch in range(epochs):
+            total_cost = 0.0 #sum error(gosa)
+            #batch
+            for i in range(batch_num):
+                batch = X[i*batch_size : (i+1)*batch_size] #slice
 
-    def decode(self, y):
-        #evaluate z
-        return sigmoid(np.dot(self.dec_w, y) + self.dec_b)
+                cost, gradEnc_w, gradDec_w, gradEnc_b, gradDec_b = \
+                    self.partial_differentiation(batch, len(X)) #partial differentiation
 
-    def corrupt(self, x, noise):
-        #make noise
-        return self.rng.binomial(size = x.shape, n = 1, p = 1.0 - noise) * x
+                #update weight and bias
+                total_cost += cost
+                self.enc_w -= learning_rate * gradEnc_w
+                self.dec_w -= learning_rate * gradDec_w
+                self.enc_b -= learning_rate * gradEnc_w
+                self.dec_b -= learning_rate * gradDec_w
 
-    def get_cost(self, x, z):
-        eps = 1e-10
-        return - np.sum((x * np.log(z + eps) + (1.-x) * np.log(1.-z + eps)))
+                grad_sum = gradEnc_w.sum() + gradDec_w.sum() + gradEnc_w.sum() + gradDec_w.sum()
+
+            print(epoch)
+            print((1. / batch_num) * total_cost)
 
     def display(self):
         tile_size = (int(np.sqrt(self.enc_w[0].size)), int(np.sqrt(self.enc_w[0].size)))
-
         panel_shape = (10, 10)
+        margin_y = np.zeros(tile_size[1])
+        margin_x = np.zeros((tile_size[0] + 1) * panel_shape[0])
+        image = margin_x.copy()
+
+        for y in range(panel_shape[1]):
+            tmp = np.hstack( [ np.c_[ scale( x.reshape(tile_size) ), margin_y ]
+                for x in self.enc_w[y*panel_shape[0]:(y+1)*panel_shape[0]]])
+            tmp = np.vstack([tmp, margin_x])
+
+            image = np.vstack([image, tmp])
+
+        img = Image.fromarray(image)
+        img = img.convert('RGB')
+        return img
 
         #return utils.visualize_weights(self.enc_w, panel_shape, tile_size)
 
@@ -125,7 +145,10 @@ class AutoEncoder(object):
 if __name__ == '__main__':
     ae = AutoEncoder(n_visible_units=784, n_hidden_units=100, noise=0.2)
     #load_data
-    #with gzip.open('mnist.pkl.gz', 'rb') as f:
-    #    train_data, test_data, valid_data = pickle.load(f)
+    with gzip.open('mnist.pkl.gz', 'rb') as f:
+        train_data, test_data, valid_data = pickle.load(f, encoding='latin1')
 
-    #ae.sgd_train()
+    #train_data[0] => len(train_data)=2
+    ae.sgd_train(train_data[0])
+    img = ae.display()
+    img.show()
