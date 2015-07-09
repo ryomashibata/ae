@@ -26,8 +26,6 @@ class AutoEncoder(object):
         r = np.sqrt(6. / (n_hidden_units + n_visible_units + 1))
         #encode weight setting
         self.enc_w = np.array(self.rng.uniform(-r, r, (n_visible_units, n_hidden_units)))
-        #decode weight setting
-        self.dec_w = self.enc_w.T
         #bias setting
         self.enc_b = np.zeros(n_hidden_units)
         self.dec_b = np.zeros(n_visible_units)
@@ -35,6 +33,7 @@ class AutoEncoder(object):
         self.n_visible = n_visible_units
         self.n_hidden = n_hidden_units
         self.noise = noise
+        print("hoge")
 
     def encode(self, x):
         #evaluate y
@@ -42,7 +41,7 @@ class AutoEncoder(object):
 
     def decode(self, y):
         #evaluate z
-        return sigmoid(np.dot(self.dec_w.T, y) + self.dec_b)
+        return sigmoid(np.dot(self.enc_w, y) + self.dec_b)
 
     def corrupt(self, x, noise):
         #make noise
@@ -52,12 +51,11 @@ class AutoEncoder(object):
         eps = 1e-10
         return - np.sum((x * np.log(z + eps) + (1.-x) * np.log(1.-z + eps)))
 
-    def partial_differentiation(self, x_batch, dnum):
+    def partial_differentiation(self, x_batch):
 
         #cost:diff enc,dec. initial grad
         cost = 0.
         grad_enc_w = np.zeros(self.enc_w.shape)
-        grad_dec_w = np.zeros(self.dec_w.shape)
         grad_enc_b = np.zeros(self.enc_b.shape)
         grad_dec_b = np.zeros(self.dec_b.shape)
 
@@ -72,31 +70,34 @@ class AutoEncoder(object):
             #get_cost:L = -Lh = xlogz + (1-x)log(1-z)
             cost += self.get_cost(x,z)
 
-            delta1 = - (x - z)
+            alpha_h2 = x - z
+            alpha_h1 = np.dot(self.enc_w.T, alpha_h2) * sigmoid_deriv(y)
 
-            #np.outer: outer product => nerrow sense tensor product
-            grad_enc_w += np.outer(delta1, y).T
-            grad_dec_b += delta1
+            grad_enc_b = alpha_h1
+            grad_dec_b = alpha_h2
 
-            delta2 = np.dot(self.dec_w.T, delta1) * self.sigmoid_prime(y)
-            grad_enc_w += np.outer(delta2, tilde_x)
-            grad_enc_b += delta2
+            alpha_h1 = np.atleast_2d(alpha_h1)
+            tilde_x = np.atleast_2d(tilde_x)
+            alpha_h2 = np.atleast_2d(alpha_h2)
+            y = np.atleast_2d(y)
+
+            grad_enc_w = (np.dot(alpha_h1.T, tilde_x) + (np.dot(alpha_h2.T, y)).T).T
 
         #Normalization
         cost /= len(x_batch)
         grad_enc_w /= len(x_batch)
-        grad_dec_w /= len(x_batch)
         grad_enc_b /= len(x_batch)
         grad_dec_b /= len(x_batch)
 
-        return cost, grad_enc_w, grad_dec_w, grad_enc_b, grad_dec_b
+        return cost, grad_enc_w, grad_enc_b, grad_dec_b
 
     #learning_rate, epochs:repeat learning count
-    def sgd_train(self, X, learning_rate=0.1, epochs=20, batch_size = 20):
+    def sgd_train(self, X, learning_rate=0.2, epochs=20, batch_size = 20):
         #minibatch algorizhm
         #partition length learning_data
         batch_num = len(X) / batch_size
         batch_num = int(batch_num)
+
         #online
         for epoch in range(epochs):
             total_cost = 0.0 #sum error(gosa)
@@ -104,17 +105,14 @@ class AutoEncoder(object):
             for i in range(batch_num):
                 batch = X[i*batch_size : (i+1)*batch_size] #slice
 
-                cost, gradEnc_w, gradDec_w, gradEnc_b, gradDec_b = \
-                    self.partial_differentiation(batch, len(X)) #partial differentiation
+                cost, gradEnc_w, gradEnc_b, gradDec_b = \
+                    self.partial_differentiation(batch) #partial differentiation
 
                 #update weight and bias
                 total_cost += cost
-                self.enc_w -= learning_rate * gradEnc_w
-                self.dec_w -= learning_rate * gradDec_w
-                self.enc_b -= learning_rate * gradEnc_w
-                self.dec_b -= learning_rate * gradDec_w
-
-                grad_sum = gradEnc_w.sum() + gradDec_w.sum() + gradEnc_w.sum() + gradDec_w.sum()
+                self.enc_w += learning_rate * gradEnc_w
+                self.enc_b += learning_rate * gradEnc_b
+                self.dec_b += learning_rate * gradDec_b
 
             print(epoch)
             print((1. / batch_num) * total_cost)
@@ -135,7 +133,7 @@ class AutoEncoder(object):
 
         img = Image.fromarray(image)
         img = img.convert('RGB')
-        return img
+        img.show()
 
         #return utils.visualize_weights(self.enc_w, panel_shape, tile_size)
 
@@ -150,5 +148,4 @@ if __name__ == '__main__':
 
     #train_data[0] => len(train_data)=2
     ae.sgd_train(train_data[0])
-    img = ae.display()
-    img.show()
+    ae.display()
