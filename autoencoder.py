@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import gzip
 from PIL import Image
+import pylab
 
 def sigmoid(x, beta=1.0):
     return 1.0 / (1.0 + np.exp(beta * -x))
@@ -117,6 +118,21 @@ class AutoEncoder(object):
             print(epoch)
             print((1. / batch_num) * total_cost)
 
+    def conpare_image(self, p, inputs, targets):
+        for i in range(p.size):
+            tilde_x = self.corrupt(inputs[p[i]], self.noise)
+            y = self.encode(tilde_x)
+            z = self.decode(y)
+            pylab.subplot(2, p.size, i + 1)
+            pylab.axis('off')
+            pylab.imshow(tilde_x.reshape(28, 28), cmap=pylab.cm.gray_r, interpolation='nearest')
+            pylab.title('nimg %i' % targets[p[i]])
+            pylab.subplot(2, p.size, i + 6)
+            pylab.axis('off')
+            pylab.imshow(z.reshape(28, 28), cmap=pylab.cm.gray_r, interpolation='nearest')
+            pylab.title('dimg %i' % targets[p[i]])
+        pylab.show()
+
     def display(self):
         tile_size = (int(np.sqrt(self.enc_w[0].size)), int(np.sqrt(self.enc_w[0].size)))
         panel_shape = (10, 10)
@@ -148,4 +164,6 @@ if __name__ == '__main__':
 
     #train_data[0] => len(train_data)=2
     ae.sgd_train(train_data[0])
-    ae.display()
+    p = np.random.random_integers(0, len(valid_data[0]), 5)
+    ae.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
+    #ae.display()
