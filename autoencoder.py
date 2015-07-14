@@ -34,7 +34,7 @@ class AutoEncoder(object):
         self.n_visible = n_visible_units
         self.n_hidden = n_hidden_units
         self.noise = noise
-        print("hoge")
+        print('hoge')
 
     def encode(self, x):
         #evaluate y
@@ -93,7 +93,7 @@ class AutoEncoder(object):
         return cost, grad_enc_w, grad_enc_b, grad_dec_b
 
     #learning_rate, epochs:repeat learning count
-    def sgd_train(self, X, learning_rate=0.2, epochs=20, batch_size = 20):
+    def sgd_train(self, X, learning_rate=0.5, epochs=5, batch_size = 20):
         #minibatch algorizhm
         #partition length learning_data
         batch_num = len(X) / batch_size
@@ -119,19 +119,27 @@ class AutoEncoder(object):
             print((1. / batch_num) * total_cost)
 
     def conpare_image(self, p, inputs, targets):
+        rt = int(np.sqrt(inputs[0].size))
         for i in range(p.size):
             tilde_x = self.corrupt(inputs[p[i]], self.noise)
             y = self.encode(tilde_x)
             z = self.decode(y)
             pylab.subplot(2, p.size, i + 1)
             pylab.axis('off')
-            pylab.imshow(tilde_x.reshape(28, 28), cmap=pylab.cm.gray_r, interpolation='nearest')
+            pylab.imshow(tilde_x.reshape(rt, rt), cmap=pylab.cm.gray_r, interpolation='nearest')
             pylab.title('nimg %i' % targets[p[i]])
             pylab.subplot(2, p.size, i + 6)
             pylab.axis('off')
-            pylab.imshow(z.reshape(28, 28), cmap=pylab.cm.gray_r, interpolation='nearest')
+            pylab.imshow(z.reshape(rt, rt), cmap=pylab.cm.gray_r, interpolation='nearest')
             pylab.title('dimg %i' % targets[p[i]])
         pylab.show()
+
+    def fix_parameters(self, X):
+        data = []
+        for i in range(int(len(X))):
+            tilde_x = self.corrupt(X[i], self.noise)
+            data.append(self.encode(tilde_x))
+        return data
 
     def display(self):
         tile_size = (int(np.sqrt(self.enc_w[0].size)), int(np.sqrt(self.enc_w[0].size)))
@@ -157,13 +165,29 @@ class AutoEncoder(object):
         #return utils.visualize_weights(self.enc_w, panel_shape, tile_size)
 
 if __name__ == '__main__':
-    ae = AutoEncoder(n_visible_units=784, n_hidden_units=100, noise=0.2)
     #load_data
     with gzip.open('mnist.pkl.gz', 'rb') as f:
         train_data, test_data, valid_data = pickle.load(f, encoding='latin1')
 
     #train_data[0] => len(train_data)=2
-    ae.sgd_train(train_data[0])
+    first = AutoEncoder(n_visible_units=784, n_hidden_units=256, noise=0.1)
+    first.sgd_train(train_data[0])
     p = np.random.random_integers(0, len(valid_data[0]), 5)
-    ae.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
-    #ae.display()
+    first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
+    data = first.fix_parameters(train_data[0])
+    vl_data = first.fix_parameters(valid_data[0])
+
+    second = AutoEncoder(n_visible_units=256, n_hidden_units=100, noise=0.2)
+    second.sgd_train(data)
+    p = np.random.random_integers(0, len(valid_data[0]), 5)
+    second.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
+    data = second.fix_parameters(data)
+    vl_data = second.fix_parameters(vl_data)
+
+    third = AutoEncoder(n_visible_units=100, n_hidden_units=49, noise=0.3)
+    third.sgd_train(data)
+    p = np.random.random_integers(0, len(valid_data[0]), 5)
+    third.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
+    data = third.fix_parameters(data)
+
+    #third.display()
