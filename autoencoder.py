@@ -93,7 +93,7 @@ class AutoEncoder(object):
         return cost, grad_enc_w, grad_enc_b, grad_dec_b
 
     #learning_rate, epochs:repeat learning count
-    def sgd_train(self, X, learning_rate=0.5, epochs=5, batch_size = 20):
+    def sgd_train(self, X, learning_rate=0.3, epochs=10, batch_size = 20):
         #minibatch algorizhm
         #partition length learning_data
         batch_num = len(X) / batch_size
@@ -133,6 +133,7 @@ class AutoEncoder(object):
             pylab.imshow(z.reshape(rt, rt), cmap=pylab.cm.gray_r, interpolation='nearest')
             pylab.title('dimg %i' % targets[p[i]])
         pylab.show()
+        pylab.savefig('output.png')
 
     def fix_parameters(self, X):
         data = []
@@ -140,6 +141,16 @@ class AutoEncoder(object):
             tilde_x = self.corrupt(X[i], self.noise)
             data.append(self.encode(tilde_x))
         return data
+
+    def output(self, X):
+        data = []
+        for i in range(int(len(X))):
+            data.append(self.decode(X[i]))
+        return data
+
+    def dump_weights(self, file_name):
+        self.enc_w.dump(file_name + "_w.dmp")
+        self.enc_b.dump(file_name + "_b.dmp")
 
     def display(self):
         tile_size = (int(np.sqrt(self.enc_w[0].size)), int(np.sqrt(self.enc_w[0].size)))
@@ -172,22 +183,40 @@ if __name__ == '__main__':
     #train_data[0] => len(train_data)=2
     first = AutoEncoder(n_visible_units=784, n_hidden_units=256, noise=0.1)
     first.sgd_train(train_data[0])
-    p = np.random.random_integers(0, len(valid_data[0]), 5)
-    first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
+    #p = np.random.random_integers(0, len(valid_data[0]), 5)
+    #first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
     data = first.fix_parameters(train_data[0])
     vl_data = first.fix_parameters(valid_data[0])
+    first.dump_weights(file_name="first")
 
     second = AutoEncoder(n_visible_units=256, n_hidden_units=100, noise=0.2)
     second.sgd_train(data)
-    p = np.random.random_integers(0, len(valid_data[0]), 5)
-    second.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
+    #p = np.random.random_integers(0, len(valid_data[0]), 5)
+    #second.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
     data = second.fix_parameters(data)
     vl_data = second.fix_parameters(vl_data)
+    second.dump_weights(file_name="second")
 
     third = AutoEncoder(n_visible_units=100, n_hidden_units=49, noise=0.3)
     third.sgd_train(data)
-    p = np.random.random_integers(0, len(valid_data[0]), 5)
-    third.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
+    #p = np.random.random_integers(0, len(valid_data[0]), 5)
+    #third.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
     data = third.fix_parameters(data)
+    vl_data = third.fix_parameters(vl_data)
+    third.dump_weights(file_name="third")
+
+    last = AutoEncoder(n_visible_units=49, n_hidden_units=25, noise=0.3)
+    last.sgd_train(data)
+    #p = np.random.random_integers(0, len(valid_data[0]), 5)
+    #last.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
+    data = last.fix_parameters(data)
+    last.dump_weights(file_name="last")
+
+    data = last.output(data)
+    data = third.output(data)
+    data = second.output(data)
+    data = first.output(data)
+    p = np.random.random_integers(0, len(valid_data[0]), 5)
+    first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
 
     #third.display()
