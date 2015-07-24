@@ -5,6 +5,7 @@ import pickle
 import gzip
 from PIL import Image
 import pylab
+import os
 
 def sigmoid(x, beta=1.0):
     return 1.0 / (1.0 + np.exp(beta * -x))
@@ -18,6 +19,15 @@ def scale(x):
     x -= x.min()
     x *= 1.0 / (x.max() + eps)
     return 255.0*x
+
+def add_bias(x, axis=None):
+    return np.insert(x, 0, 1, axis=axis)
+
+def enc(X, w, b):
+    data = []
+    for i in range(int(len(X))):
+        data.append(sigmoid(np.dot(w.T, X[i]) + b))
+    return data
 
 class AutoEncoder(object):
     def __init__(self, n_visible_units, n_hidden_units, noise):
@@ -175,48 +185,104 @@ class AutoEncoder(object):
         #panel_shape = (int(np.sqrt(self.enc_w.shape[0])), int(np.sqrt(self.enc_w.shape[0])))
         #return utils.visualize_weights(self.enc_w, panel_shape, tile_size)
 
+#Multi-Layer Perceptron(多層パーセプトロン)
+class MLP(object):
+    def __init__(self, n_input_units, n_hidden_units, n_output_units):
+        self.nin = n_input_units
+        self.nhid = n_hidden_units
+        self.nout = n_output_units
+
+        #入力→中間層の重みの初期値代入
+        self.v = np.random.uniform(-1.0, 1.0, (self.nhid, self.nin+1))
+        #中間→出力層の重みの初期値代入
+        self.w = np.random.uniform(-1.0, 1.0, (self.nout, self.nhid+1))
+
+    #leaning_rateは学習係数, 最急降下法で用いる．epochsは学習の回数
+    def fit(self, inputs, targets, learning_rate=0.2, epochs=200000):
+        inputs = add_bias(inputs, axis=1)
+
+        for loop_cnt in range(epochs):
+            p = np.random.randint(inputs.shape[0]) #0~50000までの値のどれかを返す
+            ip = inputs[p] #inputs_pattern. パターンpの入力信号
+            tp = targets[p] #teach_pattern. パターンpの教師信号
+
+            #入力した値を出力するまでの処理
+            oj = sigmoid(np.dot(self.v, ip)) #j列のニューロンを求める処理
+            oj = add_bias(oj) #j列のニューロンに仮想ニューロンを追加
+            ok = sigmoid(np.dot(self.w, oj)) #k列のニューロンを求める処理
+
+            #出力と教師信号の差から重みの修正を行う(back propagation)
+            #デルタkを求める処理
+            delta_k = sigmoid_deriv(ok)*(ok - tp)
+            #デルタjを求める処理
+            delta_j = sigmoid_deriv(oj) * np.dot(self.w.T, delta_k)
+
+            oj = np.atleast_2d(oj)
+            delta_k = np.atleast_2d(delta_k)
+            self.w = self.w - learning_rate * np.dot(delta_k.T, oj) #最急降下法
+
+            ip = np.atleast_2d(ip)
+            delta_j = np.atleast_2d(delta_j)
+            self.v = self.v - learning_rate * np.dot(delta_j.T, ip)[1:, :] #最急降下法
+
+            if(loop_cnt%10000 == 0):
+                print("hoge")
+        self.v.dump("jweight.dmp")
+        self.w.dump("kweight.dmp")
+
 if __name__ == '__main__':
     #load_data
     with gzip.open('mnist.pkl.gz', 'rb') as f:
         train_data, test_data, valid_data = pickle.load(f, encoding='latin1')
 
-    #train_data[0] => len(train_data)=2
-    first = AutoEncoder(n_visible_units=784, n_hidden_units=256, noise=0.1)
-    first.sgd_train(train_data[0])
-    #p = np.random.random_integers(0, len(valid_data[0]), 5)
-    #first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
-    data = first.fix_parameters(train_data[0])
-    vl_data = first.fix_parameters(valid_data[0])
-    first.dump_weights(file_name="first")
+    if(os.path.exists("last_w.dmp")):
+        print("file Exists")
+    else:
+        #Pre-training
+        #first_train
+        first = AutoEncoder(n_visible_units=784, n_hidden_units=256, noise=0.1)
+        first.sgd_train(train_data[0])
+        data = first.fix_parameters(train_data[0])
+        vl_data = first.fix_parameters(valid_data[0])
+        first.dump_weights(file_name="first")
+        #second_train
+        second = AutoEncoder(n_visible_units=256, n_hidden_units=100, noise=0.2)
+        second.sgd_train(data)
+        data = second.fix_parameters(data)
+        vl_data = second.fix_parameters(vl_data)
+        second.dump_weights(file_name="second")
+        #third_train
+        third = AutoEncoder(n_visible_units=100, n_hidden_units=49, noise=0.3)
+        third.sgd_train(data)
+        data = third.fix_parameters(data)
+        vl_data = third.fix_parameters(vl_data)
+        third.dump_weights(file_name="third")
+        #last_train
+        last = AutoEncoder(n_visible_units=49, n_hidden_units=25, noise=0.3)
+        last.sgd_train(data)
+        data = last.fix_parameters(data)
+        last.dump_weights(file_name="last")
+        #example output
+        data = last.output(data)
+        data = third.output(data)
+        data = second.output(data)
+        data = first.output(data)
+        p = np.random.random_integers(0, len(valid_data[0]), 5)
+        first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
 
-    second = AutoEncoder(n_visible_units=256, n_hidden_units=100, noise=0.2)
-    second.sgd_train(data)
-    #p = np.random.random_integers(0, len(valid_data[0]), 5)
-    #second.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
-    data = second.fix_parameters(data)
-    vl_data = second.fix_parameters(vl_data)
-    second.dump_weights(file_name="second")
+    #fine tuning
+    w1 = np.load("first_w.dmp")
+    b1 = np.load("first_b.dmp")
+    w2 = np.load("second_w.dmp")
+    b2 = np.load("second_b.dmp")
+    w3 = np.load("third_w.dmp")
+    b3 = np.load("third_b.dmp")
+    w4 = np.load("last_w.dmp")
+    b4 = np.load("last_b.dmp")
+    inputs = enc(train_data[0], w1, b1)
+    inputs = enc(inputs, w2, b2)
+    inputs = enc(inputs, w3, b3)
+    inputs = enc(inputs, w4, b4)
 
-    third = AutoEncoder(n_visible_units=100, n_hidden_units=49, noise=0.3)
-    third.sgd_train(data)
-    #p = np.random.random_integers(0, len(valid_data[0]), 5)
-    #third.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
-    data = third.fix_parameters(data)
-    vl_data = third.fix_parameters(vl_data)
-    third.dump_weights(file_name="third")
-
-    last = AutoEncoder(n_visible_units=49, n_hidden_units=25, noise=0.3)
-    last.sgd_train(data)
-    #p = np.random.random_integers(0, len(valid_data[0]), 5)
-    #last.conpare_image(p, np.array(vl_data), np.array(valid_data[1]))
-    data = last.fix_parameters(data)
-    last.dump_weights(file_name="last")
-
-    data = last.output(data)
-    data = third.output(data)
-    data = second.output(data)
-    data = first.output(data)
-    p = np.random.random_integers(0, len(valid_data[0]), 5)
-    first.conpare_image(p, np.array(valid_data[0]), np.array(valid_data[1]))
-
-    #third.display()
+    mlp = MLP(n_input_units=25, n_hidden_units=40, n_output_units=10)
+    mlp.fit(inputs, train_data[1])
