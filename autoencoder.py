@@ -103,7 +103,7 @@ class AutoEncoder(object):
         return cost, grad_enc_w, grad_enc_b, grad_dec_b
 
     #learning_rate, epochs:repeat learning count
-    def sgd_train(self, X, learning_rate=0.3, epochs=10, batch_size = 20):
+    def sgd_train(self, X, learning_rate=0.4, epochs=10, batch_size = 20):
         #minibatch algorizhm
         #partition length learning_data
         batch_num = len(X) / batch_size
@@ -204,7 +204,8 @@ class MLP(object):
         for loop_cnt in range(epochs):
             p = np.random.randint(inputs.shape[0]) #0~50000までの値のどれかを返す
             ip = inputs[p] #inputs_pattern. パターンpの入力信号
-            tp = targets[p] #teach_pattern. パターンpの教師信号
+            tp = np.zeros(10)
+            tp[targets[p]] = 1 #teach_pattern. パターンpの教師信号
 
             #入力した値を出力するまでの処理
             oj = sigmoid(np.dot(self.v, ip)) #j列のニューロンを求める処理
@@ -226,9 +227,24 @@ class MLP(object):
             self.v = self.v - learning_rate * np.dot(delta_j.T, ip)[1:, :] #最急降下法
 
             if(loop_cnt%10000 == 0):
-                print("hoge")
+                print(targets[p])
+                print(tp)
+                print(tp.shape)
         self.v.dump("jweight.dmp")
         self.w.dump("kweight.dmp")
+
+    def experiment(self, inputs, targets):
+        jw = np.load("jweight.dmp")
+        kw = np.load("kweight.dmp")
+        inputs = add_bias(inputs, axis=1)
+        count = 0
+        for i,t in zip(inputs, range(targets.size)):
+            oj = sigmoid(np.dot(jw, i))
+            oj = add_bias(oj)
+            ok = sigmoid(np.dot(kw, oj))
+            if(np.argmax(ok) == targets[t]):
+                count += 1
+        print("Correct Answer Rate:%s, %d" % (count/targets.size, count))
 
 if __name__ == '__main__':
     #load_data
@@ -285,4 +301,12 @@ if __name__ == '__main__':
     inputs = enc(inputs, w4, b4)
 
     mlp = MLP(n_input_units=25, n_hidden_units=40, n_output_units=10)
-    mlp.fit(inputs, train_data[1])
+    if(os.path.exists("jweight.dmp")):
+        print("file Exists")
+    else:
+        mlp.fit(inputs, train_data[1])
+    inputs = enc(test_data[0], w1, b1)
+    inputs = enc(inputs, w2, b2)
+    inputs = enc(inputs, w3, b3)
+    inputs = enc(inputs, w4, b4)
+    mlp.experiment(inputs, test_data[1])

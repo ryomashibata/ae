@@ -1,5 +1,1 @@
 *.dmp
-
-*.gz
-
-mnist.py
