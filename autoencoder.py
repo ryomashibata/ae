@@ -103,7 +103,7 @@ class AutoEncoder(object):
         return cost, grad_enc_w, grad_enc_b, grad_dec_b
 
     #learning_rate, epochs:repeat learning count
-    def sgd_train(self, X, learning_rate=0.4, epochs=10, batch_size = 20):
+    def sgd_train(self, X, learning_rate=0.2, epochs=10, batch_size = 20):
         #minibatch algorizhm
         #partition length learning_data
         batch_num = len(X) / batch_size
@@ -198,7 +198,7 @@ class MLP(object):
         self.w = np.random.uniform(-1.0, 1.0, (self.nout, self.nhid+1))
 
     #leaning_rateは学習係数, 最急降下法で用いる．epochsは学習の回数
-    def fit(self, inputs, targets, learning_rate=0.2, epochs=200000):
+    def fit(self, inputs, targets, learning_rate=0.5, epochs=200000):
         inputs = add_bias(inputs, axis=1)
 
         for loop_cnt in range(epochs):
@@ -238,13 +238,17 @@ class MLP(object):
         kw = np.load("kweight.dmp")
         inputs = add_bias(inputs, axis=1)
         count = 0
+        ms = np.zeros(10)
         for i,t in zip(inputs, range(targets.size)):
             oj = sigmoid(np.dot(jw, i))
             oj = add_bias(oj)
             ok = sigmoid(np.dot(kw, oj))
             if(np.argmax(ok) == targets[t]):
                 count += 1
+            else:
+                ms[targets[t]] += 1
         print("Correct Answer Rate:%s, %d" % (count/targets.size, count))
+        print("Miss Rate %s" % (ms/targets.size))
 
 if __name__ == '__main__':
     #load_data

@@ -1,0 +1,28 @@
+information
+
+first = AutoEncoder(n_visible_units=784, n_hidden_units=256, noise=0.1)
+second = AutoEncoder(n_visible_units=256, n_hidden_units=100, noise=0.2)
+third = AutoEncoder(n_visible_units=100, n_hidden_units=49, noise=0.3)
+last = AutoEncoder(n_visible_units=49, n_hidden_units=25, noise=0.3)
+
+mlp = MLP(n_input_units=25, n_hidden_units=40, n_output_units=10)
+
+
+###parameter###
+#sigmoid
+beta:0.2
+
+#scale
+eps:1e-8
+
+#Autoencoder
+learning_rate:0.2
+epochs:15
+batch_size:20
+
+#MLP-fit
+learning_rate:0.2
+epochs:200000
+
+#MLP-experiment
+Correct Answer Rate:0.9005
